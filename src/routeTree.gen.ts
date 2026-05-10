@@ -9,11 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TablesRouteImport } from './routes/tables'
 import { Route as PosRouteImport } from './routes/pos'
 import { Route as MenuRouteImport } from './routes/menu'
 import { Route as KdsRouteImport } from './routes/kds'
 import { Route as IndexRouteImport } from './routes/index'
 
+const TablesRoute = TablesRouteImport.update({
+  id: '/tables',
+  path: '/tables',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PosRoute = PosRouteImport.update({
   id: '/pos',
   path: '/pos',
@@ -40,12 +46,14 @@ export interface FileRoutesByFullPath {
   '/kds': typeof KdsRoute
   '/menu': typeof MenuRoute
   '/pos': typeof PosRoute
+  '/tables': typeof TablesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/kds': typeof KdsRoute
   '/menu': typeof MenuRoute
   '/pos': typeof PosRoute
+  '/tables': typeof TablesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,14 @@ export interface FileRoutesById {
   '/kds': typeof KdsRoute
   '/menu': typeof MenuRoute
   '/pos': typeof PosRoute
+  '/tables': typeof TablesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/kds' | '/menu' | '/pos'
+  fullPaths: '/' | '/kds' | '/menu' | '/pos' | '/tables'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/kds' | '/menu' | '/pos'
-  id: '__root__' | '/' | '/kds' | '/menu' | '/pos'
+  to: '/' | '/kds' | '/menu' | '/pos' | '/tables'
+  id: '__root__' | '/' | '/kds' | '/menu' | '/pos' | '/tables'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,10 +76,18 @@ export interface RootRouteChildren {
   KdsRoute: typeof KdsRoute
   MenuRoute: typeof MenuRoute
   PosRoute: typeof PosRoute
+  TablesRoute: typeof TablesRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/tables': {
+      id: '/tables'
+      path: '/tables'
+      fullPath: '/tables'
+      preLoaderRoute: typeof TablesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pos': {
       id: '/pos'
       path: '/pos'
@@ -107,6 +124,7 @@ const rootRouteChildren: RootRouteChildren = {
   KdsRoute: KdsRoute,
   MenuRoute: MenuRoute,
   PosRoute: PosRoute,
+  TablesRoute: TablesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
