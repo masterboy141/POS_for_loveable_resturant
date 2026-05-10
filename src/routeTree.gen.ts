@@ -13,6 +13,7 @@ import { Route as TablesRouteImport } from './routes/tables'
 import { Route as PosRouteImport } from './routes/pos'
 import { Route as MenuRouteImport } from './routes/menu'
 import { Route as KdsRouteImport } from './routes/kds'
+import { Route as InventoryRouteImport } from './routes/inventory'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as ComingSoonRouteImport } from './routes/coming-soon'
 import { Route as IndexRouteImport } from './routes/index'
@@ -37,6 +38,11 @@ const KdsRoute = KdsRouteImport.update({
   path: '/kds',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InventoryRoute = InventoryRouteImport.update({
+  id: '/inventory',
+  path: '/inventory',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CustomersRoute = CustomersRouteImport.update({
   id: '/customers',
   path: '/customers',
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/coming-soon': typeof ComingSoonRoute
   '/customers': typeof CustomersRoute
+  '/inventory': typeof InventoryRoute
   '/kds': typeof KdsRoute
   '/menu': typeof MenuRoute
   '/pos': typeof PosRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/coming-soon': typeof ComingSoonRoute
   '/customers': typeof CustomersRoute
+  '/inventory': typeof InventoryRoute
   '/kds': typeof KdsRoute
   '/menu': typeof MenuRoute
   '/pos': typeof PosRoute
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/coming-soon': typeof ComingSoonRoute
   '/customers': typeof CustomersRoute
+  '/inventory': typeof InventoryRoute
   '/kds': typeof KdsRoute
   '/menu': typeof MenuRoute
   '/pos': typeof PosRoute
@@ -87,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/coming-soon'
     | '/customers'
+    | '/inventory'
     | '/kds'
     | '/menu'
     | '/pos'
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
     | '/'
     | '/coming-soon'
     | '/customers'
+    | '/inventory'
     | '/kds'
     | '/menu'
     | '/pos'
@@ -105,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/coming-soon'
     | '/customers'
+    | '/inventory'
     | '/kds'
     | '/menu'
     | '/pos'
@@ -115,6 +127,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ComingSoonRoute: typeof ComingSoonRoute
   CustomersRoute: typeof CustomersRoute
+  InventoryRoute: typeof InventoryRoute
   KdsRoute: typeof KdsRoute
   MenuRoute: typeof MenuRoute
   PosRoute: typeof PosRoute
@@ -151,6 +164,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KdsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/inventory': {
+      id: '/inventory'
+      path: '/inventory'
+      fullPath: '/inventory'
+      preLoaderRoute: typeof InventoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/customers': {
       id: '/customers'
       path: '/customers'
@@ -179,6 +199,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ComingSoonRoute: ComingSoonRoute,
   CustomersRoute: CustomersRoute,
+  InventoryRoute: InventoryRoute,
   KdsRoute: KdsRoute,
   MenuRoute: MenuRoute,
   PosRoute: PosRoute,
