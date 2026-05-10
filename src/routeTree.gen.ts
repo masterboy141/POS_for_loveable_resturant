@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as PosRouteImport } from './routes/pos'
+import { Route as KdsRouteImport } from './routes/kds'
 import { Route as IndexRouteImport } from './routes/index'
 
 const PosRoute = PosRouteImport.update({
   id: '/pos',
   path: '/pos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KdsRoute = KdsRouteImport.update({
+  id: '/kds',
+  path: '/kds',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -25,27 +31,31 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/kds': typeof KdsRoute
   '/pos': typeof PosRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/kds': typeof KdsRoute
   '/pos': typeof PosRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/kds': typeof KdsRoute
   '/pos': typeof PosRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/pos'
+  fullPaths: '/' | '/kds' | '/pos'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/pos'
-  id: '__root__' | '/' | '/pos'
+  to: '/' | '/kds' | '/pos'
+  id: '__root__' | '/' | '/kds' | '/pos'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  KdsRoute: typeof KdsRoute
   PosRoute: typeof PosRoute
 }
 
@@ -56,6 +66,13 @@ declare module '@tanstack/react-router' {
       path: '/pos'
       fullPath: '/pos'
       preLoaderRoute: typeof PosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kds': {
+      id: '/kds'
+      path: '/kds'
+      fullPath: '/kds'
+      preLoaderRoute: typeof KdsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -70,6 +87,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  KdsRoute: KdsRoute,
   PosRoute: PosRoute,
 }
 export const routeTree = rootRouteImport
