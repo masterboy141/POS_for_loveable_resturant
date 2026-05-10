@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TablesRouteImport } from './routes/tables'
+import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as PosRouteImport } from './routes/pos'
 import { Route as MenuRouteImport } from './routes/menu'
 import { Route as KdsRouteImport } from './routes/kds'
@@ -21,6 +22,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const TablesRoute = TablesRouteImport.update({
   id: '/tables',
   path: '/tables',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PosRoute = PosRouteImport.update({
@@ -67,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/kds': typeof KdsRoute
   '/menu': typeof MenuRoute
   '/pos': typeof PosRoute
+  '/reports': typeof ReportsRoute
   '/tables': typeof TablesRoute
 }
 export interface FileRoutesByTo {
@@ -77,6 +84,7 @@ export interface FileRoutesByTo {
   '/kds': typeof KdsRoute
   '/menu': typeof MenuRoute
   '/pos': typeof PosRoute
+  '/reports': typeof ReportsRoute
   '/tables': typeof TablesRoute
 }
 export interface FileRoutesById {
@@ -88,6 +96,7 @@ export interface FileRoutesById {
   '/kds': typeof KdsRoute
   '/menu': typeof MenuRoute
   '/pos': typeof PosRoute
+  '/reports': typeof ReportsRoute
   '/tables': typeof TablesRoute
 }
 export interface FileRouteTypes {
@@ -100,6 +109,7 @@ export interface FileRouteTypes {
     | '/kds'
     | '/menu'
     | '/pos'
+    | '/reports'
     | '/tables'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -110,6 +120,7 @@ export interface FileRouteTypes {
     | '/kds'
     | '/menu'
     | '/pos'
+    | '/reports'
     | '/tables'
   id:
     | '__root__'
@@ -120,6 +131,7 @@ export interface FileRouteTypes {
     | '/kds'
     | '/menu'
     | '/pos'
+    | '/reports'
     | '/tables'
   fileRoutesById: FileRoutesById
 }
@@ -131,6 +143,7 @@ export interface RootRouteChildren {
   KdsRoute: typeof KdsRoute
   MenuRoute: typeof MenuRoute
   PosRoute: typeof PosRoute
+  ReportsRoute: typeof ReportsRoute
   TablesRoute: typeof TablesRoute
 }
 
@@ -141,6 +154,13 @@ declare module '@tanstack/react-router' {
       path: '/tables'
       fullPath: '/tables'
       preLoaderRoute: typeof TablesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pos': {
@@ -203,6 +223,7 @@ const rootRouteChildren: RootRouteChildren = {
   KdsRoute: KdsRoute,
   MenuRoute: MenuRoute,
   PosRoute: PosRoute,
+  ReportsRoute: ReportsRoute,
   TablesRoute: TablesRoute,
 }
 export const routeTree = rootRouteImport
