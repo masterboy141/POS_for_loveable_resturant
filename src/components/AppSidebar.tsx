@@ -24,11 +24,11 @@ import {
 } from "@/components/ui/sidebar";
 
 const main = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "POS Billing", url: "/pos", icon: ShoppingCart },
   { title: "Kitchen Display", url: "/kds", icon: ChefHat },
+  { title: "Billing", url: "/pos", icon: ShoppingCart },
   { title: "Menu", url: "/menu", icon: UtensilsCrossed },
   { title: "Tables", url: "/tables", icon: Armchair },
+  { title: "Dashboard", url: "/", icon: LayoutDashboard },
 ];
 
 const manage = [
