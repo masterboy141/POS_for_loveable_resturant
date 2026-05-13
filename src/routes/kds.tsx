@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, CheckCircle2, Soup, Bike, ShoppingBag, Utensils } from "lucide-react";
+import { Clock, CheckCircle2, Soup, Bike, ShoppingBag, Utensils, ChevronDown, Circle, StickyNote } from "lucide-react";
 import { Topbar } from "@/components/Topbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { initialKdsOrders, type KdsOrder } from "@/lib/pos-data";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useStore, type Order, type OrderStatus } from "@/lib/store";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/kds")({
@@ -18,37 +19,33 @@ export const Route = createFileRoute("/kds")({
   component: KDS,
 });
 
-const typeStyles: Record<KdsOrder["type"], { icon: typeof Soup; color: string }> = {
+const typeStyles: Record<Order["type"], { icon: typeof Soup; color: string }> = {
   "Dine-in": { icon: Utensils, color: "bg-primary/10 text-primary" },
   Takeaway: { icon: ShoppingBag, color: "bg-warning/15 text-warning" },
   Delivery: { icon: Bike, color: "bg-leaf/15 text-leaf" },
 };
 
+const statusStyle: Record<OrderStatus, string> = {
+  Preparing: "bg-warning/15 text-warning",
+  Ready: "bg-leaf/15 text-leaf",
+  Served: "bg-secondary text-foreground",
+  Paid: "bg-primary/10 text-primary",
+};
+
 function KDS() {
-  const [orders, setOrders] = useState<KdsOrder[]>(initialKdsOrders);
-  const [filter, setFilter] = useState<"all" | KdsOrder["type"]>("all");
-  const [tick, setTick] = useState(0);
+  const orders = useStore((s) => s.orders);
+  const setOrderStatus = useStore((s) => s.setOrderStatus);
+  const [filter, setFilter] = useState<"all" | Order["type"]>("all");
+  const [, setTick] = useState(0);
 
   useEffect(() => {
     const t = setInterval(() => setTick((x) => x + 1), 30_000);
     return () => clearInterval(t);
   }, []);
 
-  function advance(id: string) {
-    setOrders((prev) =>
-      prev.map((o) => {
-        if (o.id !== id) return o;
-        if (o.status === "Preparing") return { ...o, status: "Ready" };
-        if (o.status === "Ready") {
-          toast.success(`${o.id} marked served`);
-          return { ...o, status: "Served" };
-        }
-        return o;
-      }),
-    );
-  }
-
-  const visible = orders.filter((o) => o.status !== "Served" && (filter === "all" || o.type === filter));
+  const visible = orders.filter(
+    (o) => o.status !== "Paid" && o.status !== "Served" && (filter === "all" || o.type === filter),
+  );
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -78,7 +75,7 @@ function KDS() {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           <AnimatePresence>
             {visible.map((o) => {
-              const minsAgo = Math.floor(o.placedAt / 60_000) + tick * 0; // tick used to retrigger render
+              const minsAgo = Math.max(0, Math.floor((Date.now() - o.placedAt) / 60_000));
               const delayed = minsAgo >= 12 && o.status === "Preparing";
               const T = typeStyles[o.type];
               return (
@@ -97,7 +94,7 @@ function KDS() {
                     <div>
                       <p className="font-display text-lg font-semibold tracking-tight">{o.id}</p>
                       <p className="text-xs text-muted-foreground">
-                        Table <span className="font-medium text-foreground">{o.table}</span>
+                        Table <span className="font-medium text-foreground">{o.channel}</span>
                       </p>
                     </div>
                     <Badge className={"rounded-full border-0 " + T.color}>
@@ -106,58 +103,68 @@ function KDS() {
                   </div>
 
                   <div className="flex-1 space-y-2 p-4">
-                    {o.items.map((it, i) => (
-                      <div key={i} className="flex items-start gap-3 rounded-xl bg-secondary/50 p-2.5">
+                    {o.lines.map((it) => (
+                      <div key={it.itemId} className="flex items-start gap-3 rounded-xl bg-secondary/50 p-2.5">
                         <div className="flex size-8 items-center justify-center rounded-lg bg-background font-display text-sm font-semibold">
                           ×{it.qty}
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium leading-tight">{it.name}</p>
-                          {it.note && <p className="text-xs italic text-warning">⚠ {it.note}</p>}
                         </div>
                       </div>
                     ))}
+                    {o.note && (
+                      <div className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/10 p-2.5 text-xs text-warning">
+                        <StickyNote className="mt-0.5 size-3.5 shrink-0" />
+                        <span className="italic">{o.note}</span>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex items-center justify-between gap-3 border-t bg-background p-3">
-                    <div
-                      className={
-                        "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium " +
-                        (delayed
-                          ? "bg-destructive/10 text-destructive"
-                          : o.status === "Ready"
-                          ? "bg-leaf/15 text-leaf"
-                          : "bg-warning/15 text-warning")
-                      }
-                    >
-                      <Clock className="size-3" /> {minsAgo}m · {o.status}
+                  <div className="flex items-center justify-between gap-2 border-t bg-background p-3">
+                    <div className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-medium text-muted-foreground">
+                      <Clock className="size-3" /> {minsAgo}m
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() => advance(o.id)}
-                      className={
-                        "rounded-full " +
-                        (o.status === "Ready"
-                          ? "bg-leaf text-primary-foreground hover:bg-leaf/90"
-                          : "")
-                      }
-                    >
-                      {o.status === "Preparing" ? (
-                        <>
-                          <Soup className="mr-1.5 size-4" /> Mark Ready
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="mr-1.5 size-4" /> Mark Served
-                        </>
-                      )}
-                    </Button>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button size="sm" variant="outline" className={"rounded-full " + statusStyle[o.status]}>
+                          {o.status === "Preparing" ? <Soup className="mr-1.5 size-4" /> : <CheckCircle2 className="mr-1.5 size-4" />}
+                          {o.status}
+                          <ChevronDown className="ml-1 size-3.5" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-44 p-1.5">
+                        {(["Preparing", "Ready", "Served"] as OrderStatus[]).map((opt) => (
+                          <button
+                            key={opt}
+                            onClick={() => {
+                              setOrderStatus(o.id, opt);
+                              toast.success(`${o.id} → ${opt}`);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary"
+                          >
+                            {o.status === opt ? (
+                              <CheckCircle2 className="size-4 text-leaf" />
+                            ) : (
+                              <Circle className="size-4 text-muted-foreground" />
+                            )}
+                            {opt}
+                          </button>
+                        ))}
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </motion.div>
               );
             })}
           </AnimatePresence>
         </div>
+
+        {visible.length === 0 && (
+          <div className="rounded-3xl border border-dashed bg-card p-12 text-center text-sm text-muted-foreground">
+            No active tickets. Send an order from the Billing screen to see it here.
+          </div>
+        )}
       </div>
     </div>
   );

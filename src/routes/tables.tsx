@@ -1,45 +1,36 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Topbar } from "@/components/Topbar";
-import { tables as seedTables } from "@/lib/pos-data";
 import { Minus, Plus, Users, CalendarClock, CheckCircle2, Circle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useStore, type TableStatus } from "@/lib/store";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/tables")({
   head: () => ({
     meta: [
       { title: "Tables · Harvest POS" },
-      { name: "description", content: "Floor plan view of restaurant tables — set status and seated guests in real time." },
+      { name: "description", content: "Floor plan view of restaurant tables — set status, seated guests and reservation time." },
     ],
   }),
   component: TablesPage,
 });
 
-type Status = "available" | "occupied" | "reserved";
-type TableState = {
-  id: string;
-  number: number;
-  seats: number; // capacity
-  status: Status;
-  occupied: number; // currently seated
-};
-
-const statusStyle: Record<Status, { ring: string; chip: string; dot: string; label: string; gradient: string }> = {
+const statusStyle: Record<TableStatus, { ring: string; chip: string; dot: string; label: string; gradient: string }> = {
   available: { ring: "ring-leaf/40", chip: "bg-leaf/15 text-leaf", dot: "bg-leaf", label: "Available", gradient: "from-leaf/15 to-cream" },
   occupied: { ring: "ring-primary/50", chip: "bg-primary/10 text-primary", dot: "bg-primary", label: "Occupied", gradient: "from-primary/15 to-cream" },
   reserved: { ring: "ring-warning/50", chip: "bg-warning/15 text-warning", dot: "bg-warning", label: "Reserved", gradient: "from-warning/15 to-cream" },
 };
 
 function TablesPage() {
-  const [tables, setTables] = useState<TableState[]>(
-    seedTables.map((t) => ({ ...t, occupied: t.status === "occupied" ? Math.min(2, t.seats) : 0 })),
-  );
+  const tables = useStore((s) => s.tables);
+  const setStatus = useStore((s) => s.setTableStatus);
+  const setOccupied = useStore((s) => s.setTableOccupied);
+  const setReservation = useStore((s) => s.setTableReservation);
 
   const counts = useMemo(
     () => ({
@@ -50,44 +41,13 @@ function TablesPage() {
     [tables],
   );
 
-  const setStatus = (id: string, status: Status) => {
-    setTables((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t;
-        if (status === "occupied") {
-          return { ...t, status, occupied: t.occupied || 1 };
-        }
-        return { ...t, status, occupied: 0 };
-      }),
-    );
-    toast.success(`Marked ${id} as ${statusStyle[status].label}`);
-  };
-
-  const setOccupied = (id: string, delta: number) => {
-    setTables((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t;
-        const next = Math.max(0, Math.min(t.seats, t.occupied + delta));
-        if (next === t.occupied && delta > 0) {
-          toast.warning(`${t.id} only seats ${t.seats}`);
-          return t;
-        }
-        // Auto sync status: 0 → available, >0 → occupied (unless reserved)
-        let status: Status = t.status;
-        if (next === 0 && t.status === "occupied") status = "available";
-        if (next > 0 && t.status === "available") status = "occupied";
-        return { ...t, occupied: next, status };
-      }),
-    );
-  };
-
   return (
     <div className="flex min-h-screen flex-col">
       <Topbar title="Floor Plan" subtitle={`${tables.length} tables · ${counts.occupied} active right now`} />
 
       <div className="flex-1 space-y-5 p-4 md:p-6">
         <div className="grid gap-3 sm:grid-cols-3">
-          {(["available", "occupied", "reserved"] as Status[]).map((s) => (
+          {(["available", "occupied", "reserved"] as TableStatus[]).map((s) => (
             <div key={s} className="flex items-center gap-3 rounded-2xl border bg-card p-4 shadow-sm">
               <div className={"flex size-11 items-center justify-center rounded-xl " + statusStyle[s].chip}>
                 <span className={"size-3 rounded-full " + statusStyle[s].dot} />
@@ -122,10 +82,13 @@ function TablesPage() {
                       </button>
                     </PopoverTrigger>
                     <PopoverContent align="end" className="w-44 p-1.5">
-                      {(["available", "occupied", "reserved"] as Status[]).map((opt) => (
+                      {(["available", "occupied", "reserved"] as TableStatus[]).map((opt) => (
                         <button
                           key={opt}
-                          onClick={() => setStatus(t.id, opt)}
+                          onClick={() => {
+                            setStatus(t.id, opt);
+                            toast.success(`${t.id} → ${statusStyle[opt].label}`);
+                          }}
                           className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary"
                         >
                           {t.status === opt ? (
@@ -145,53 +108,127 @@ function TablesPage() {
                   <span className="inline-flex items-center gap-1">
                     <Users className="size-3.5" /> Capacity {t.seats}
                   </span>
-                  {t.status === "reserved" && (
+                  {t.status === "reserved" && t.reservedAt && (
                     <span className="inline-flex items-center gap-1 text-warning">
-                      <CalendarClock className="size-3.5" /> Held
+                      <CalendarClock className="size-3.5" />
+                      {new Date(t.reservedAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </span>
                   )}
                 </div>
 
-                <div className="rounded-2xl border bg-secondary/40 p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Seated guests</span>
-                    <span className="text-[10px] text-muted-foreground">max {t.seats}</span>
-                  </div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="size-8 rounded-full"
-                      onClick={() => setOccupied(t.id, -1)}
-                      disabled={t.occupied === 0}
-                    >
-                      <Minus className="size-3.5" />
-                    </Button>
-                    <div className="flex-1 text-center font-display text-xl font-semibold">
-                      {t.occupied}<span className="text-sm font-normal text-muted-foreground"> / {t.seats}</span>
+                {t.status === "reserved" ? (
+                  <ReservationEditor
+                    tableId={t.id}
+                    reservedAt={t.reservedAt}
+                    reservedName={t.reservedName}
+                    onSave={(at, name) => setReservation(t.id, at, name)}
+                  />
+                ) : (
+                  <div className="rounded-2xl border bg-secondary/40 p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Seated guests</span>
+                      <span className="text-[10px] text-muted-foreground">max {t.seats}</span>
                     </div>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="size-8 rounded-full"
-                      onClick={() => setOccupied(t.id, 1)}
-                      disabled={t.occupied >= t.seats}
-                    >
-                      <Plus className="size-3.5" />
-                    </Button>
+                    <div className="mt-2 flex items-center gap-2">
+                      <Button size="icon" variant="outline" className="size-8 rounded-full" onClick={() => setOccupied(t.id, t.occupied - 1)} disabled={t.occupied === 0}>
+                        <Minus className="size-3.5" />
+                      </Button>
+                      <div className="flex-1 text-center font-display text-xl font-semibold">
+                        {t.occupied}<span className="text-sm font-normal text-muted-foreground"> / {t.seats}</span>
+                      </div>
+                      <Button size="icon" variant="outline" className="size-8 rounded-full" onClick={() => setOccupied(t.id, t.occupied + 1)} disabled={t.occupied >= t.seats}>
+                        <Plus className="size-3.5" />
+                      </Button>
+                    </div>
+                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-background">
+                      <div
+                        className={"h-full transition-all " + (t.occupied >= t.seats ? "bg-primary" : "bg-leaf")}
+                        style={{ width: `${(t.occupied / t.seats) * 100}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-background">
-                    <div
-                      className={"h-full transition-all " + (t.occupied >= t.seats ? "bg-primary" : "bg-leaf")}
-                      style={{ width: `${(t.occupied / t.seats) * 100}%` }}
-                    />
-                  </div>
-                </div>
+                )}
               </div>
             );
           })}
         </div>
       </div>
     </div>
+  );
+}
+
+function ReservationEditor({
+  tableId,
+  reservedAt,
+  reservedName,
+  onSave,
+}: {
+  tableId: string;
+  reservedAt?: string;
+  reservedName?: string;
+  onSave: (at?: string, name?: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [at, setAt] = useState(reservedAt ?? "");
+  const [name, setName] = useState(reservedName ?? "");
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (o) {
+          setAt(reservedAt ?? "");
+          setName(reservedName ?? "");
+        }
+      }}
+    >
+      <DialogTrigger asChild>
+        <button className="rounded-2xl border bg-warning/10 p-3 text-left transition hover:bg-warning/15">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-warning">Reservation</p>
+          {reservedAt ? (
+            <>
+              <p className="mt-1 font-display text-base font-semibold">
+                {new Date(reservedAt).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" })}
+              </p>
+              {reservedName && <p className="text-xs text-muted-foreground">For {reservedName}</p>}
+            </>
+          ) : (
+            <p className="mt-1 text-xs text-muted-foreground">Tap to set reservation time</p>
+          )}
+        </button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="font-display">Reservation for {tableId}</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-3">
+          <div className="grid gap-1.5">
+            <Label>Date & time</Label>
+            <Input type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Guest name (optional)</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Mehta family" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              if (!at) {
+                toast.error("Pick a time");
+                return;
+              }
+              onSave(at, name || undefined);
+              setOpen(false);
+              toast.success("Reservation saved");
+            }}
+          >
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
