@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Minus, Plus, Search, Trash2, CreditCard, Wallet, QrCode, Receipt, Percent, ChefHat, History, Clock, CheckCircle2, StickyNote, Bike, ShoppingBag, Utensils,
+  Minus, Plus, Search, Trash2, CreditCard, Wallet, QrCode, Receipt, Percent, ChefHat, History, Clock, CheckCircle2, StickyNote, ShoppingBag, Utensils, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Topbar } from "@/components/Topbar";
@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { categories } from "@/lib/pos-data";
-import { useStore, computeTotals, type EditableMenuItem, type Order, type PayMethod } from "@/lib/store";
+import { useStore, computeTotals, type Order, type PayMethod } from "@/lib/store";
 
 export const Route = createFileRoute("/pos")({
   head: () => ({
@@ -27,14 +27,20 @@ export const Route = createFileRoute("/pos")({
   component: BillingPage,
 });
 
-const channelTypeIcon = { "Dine-in": Utensils, Takeaway: ShoppingBag, Delivery: Bike } as const;
+const channelTypeIcon = { "Dine-in": Utensils, Takeaway: ShoppingBag } as const;
 
 function BillingPage() {
   const tables = useStore((s) => s.tables);
-  const channels = useMemo(() => [...tables.map((t) => t.id), "Takeaway", "Delivery"], [tables]);
+  const clearAllCarts = useStore((s) => s.clearAllCarts);
+  const channels = useMemo(() => [...tables.map((t) => t.id), "Takeaway"], [tables]);
   const [channel, setChannel] = useState<string>("T1");
   const [tab, setTab] = useState<"new" | "pending" | "history">("new");
   const orders = useStore((s) => s.orders);
+
+  // Wipe all draft carts whenever the user leaves the Billing screen.
+  useEffect(() => {
+    return () => clearAllCarts();
+  }, [clearAllCarts]);
 
   const pending = orders.filter((o) => o.status !== "Paid" && o.status !== "Served");
   const history = orders.filter((o) => o.status === "Paid" || o.status === "Served");
@@ -79,6 +85,7 @@ function NewOrderView({ channel, setChannel, channels }: { channel: string; setC
 
   const [active, setActive] = useState("all");
   const [query, setQuery] = useState("");
+  const [footerOpen, setFooterOpen] = useState(true);
 
   const filtered = useMemo(
     () =>
@@ -92,11 +99,11 @@ function NewOrderView({ channel, setChannel, channels }: { channel: string; setC
   );
 
   const totals = computeTotals(cart.lines, cart.discountPct);
+  const hasItems = cart.lines.length > 0;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
+    <div className="grid items-start gap-4 lg:grid-cols-[1fr_420px]">
       <div className="flex min-h-0 flex-col gap-4">
-        {/* Channel selector */}
         <div className="flex flex-wrap gap-1.5 rounded-2xl border bg-card p-2">
           {channels.map((c) => (
             <button
@@ -171,16 +178,16 @@ function NewOrderView({ channel, setChannel, channels }: { channel: string; setC
         </div>
       </div>
 
-      {/* Cart */}
-      <Card className="flex h-full flex-col overflow-hidden rounded-3xl border shadow-soft">
+      {/* Cart — sticky, auto-sized so footer hugs the items. */}
+      <Card className="sticky top-20 flex flex-col overflow-hidden rounded-3xl border shadow-soft">
         <div className="border-b bg-gradient-to-r from-card to-secondary/40 p-4">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Current cart</p>
           <p className="font-display text-lg font-semibold">{channel}</p>
         </div>
 
-        <div className="flex-1 space-y-2 overflow-y-auto p-3">
-          {cart.lines.length === 0 && (
-            <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center text-muted-foreground">
+        <div className="space-y-2 p-3" style={{ maxHeight: "55vh", overflowY: "auto" }}>
+          {!hasItems && (
+            <div className="flex flex-col items-center justify-center gap-2 p-8 text-center text-muted-foreground">
               <Receipt className="size-10 opacity-40" />
               <p className="text-sm">No items yet — tap a dish to start the order for {channel}</p>
             </div>
@@ -211,60 +218,86 @@ function NewOrderView({ channel, setChannel, channels }: { channel: string; setC
           </AnimatePresence>
         </div>
 
-        <div className="space-y-3 border-t bg-gradient-to-b from-background to-secondary/40 p-4">
-          <div className="grid gap-1.5">
-            <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground"><StickyNote className="size-3.5" /> Note for kitchen</label>
-            <Textarea rows={2} value={cart.note} onChange={(e) => setNote(channel, e.target.value)} placeholder="e.g. Less spicy, no onion…" className="rounded-xl text-sm" />
-          </div>
+        {/* Retractable footer — hugs cart items, collapses when not needed. */}
+        {hasItems && (
+          <>
+            <button
+              onClick={() => setFooterOpen((v) => !v)}
+              className="flex items-center justify-between border-t bg-secondary/40 px-4 py-2 text-xs font-medium text-muted-foreground transition hover:bg-secondary"
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <Receipt className="size-3.5" />
+                {footerOpen ? "Hide payment details" : `Total ₹ ${totals.total} · Tap to expand`}
+              </span>
+              {footerOpen ? <ChevronDown className="size-4" /> : <ChevronUp className="size-4" />}
+            </button>
 
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <Percent className="size-4 text-muted-foreground" />
-              <div className="flex flex-1 gap-1 rounded-full bg-secondary p-1">
-                {[0, 5, 10, 15].map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => setDiscount(channel, d)}
-                    className={"flex-1 rounded-full py-1 text-xs font-medium transition " + (cart.discountPct === d ? "bg-leaf text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
-                  >
-                    {d}%
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-1 rounded-full bg-secondary px-2">
-                <Input
-                  type="number"
-                  value={cart.discountPct}
-                  onChange={(e) => setDiscount(channel, +e.target.value)}
-                  className="h-8 w-14 border-0 bg-transparent p-0 text-center text-sm shadow-none focus-visible:ring-0"
-                />
-                <span className="text-xs text-muted-foreground">%</span>
-              </div>
-            </div>
-          </div>
+            <AnimatePresence initial={false}>
+              {footerOpen && (
+                <motion.div
+                  key="footer"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="space-y-3 border-t bg-gradient-to-b from-background to-secondary/40 p-4">
+                    <div className="grid gap-1.5">
+                      <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground"><StickyNote className="size-3.5" /> Note for kitchen</label>
+                      <Textarea rows={2} value={cart.note} onChange={(e) => setNote(channel, e.target.value)} placeholder="e.g. Less spicy, no onion…" className="rounded-xl text-sm" />
+                    </div>
 
-          <div className="space-y-1.5 text-sm">
-            <Row label="Subtotal" value={`₹ ${totals.subtotal}`} />
-            {totals.discount > 0 && <Row label={`Discount (${cart.discountPct}%)`} value={`- ₹ ${totals.discount}`} accent />}
-            <Row label="GST" value={`₹ ${totals.tax}`} muted />
-            <Separator className="my-2" />
-            <div className="flex items-center justify-between">
-              <span className="font-display text-base font-semibold">Total</span>
-              <span className="font-display text-2xl font-bold text-gradient-brand">₹ {totals.total}</span>
-            </div>
-          </div>
+                    <div className="flex items-center gap-2">
+                      <Percent className="size-4 text-muted-foreground" />
+                      <div className="flex flex-1 gap-1 rounded-full bg-secondary p-1">
+                        {[0, 5, 10, 15].map((d) => (
+                          <button
+                            key={d}
+                            onClick={() => setDiscount(channel, d)}
+                            className={"flex-1 rounded-full py-1 text-xs font-medium transition " + (cart.discountPct === d ? "bg-leaf text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+                          >
+                            {d}%
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1 rounded-full bg-secondary px-2">
+                        <Input
+                          type="number"
+                          value={cart.discountPct}
+                          onChange={(e) => setDiscount(channel, +e.target.value)}
+                          className="h-8 w-14 border-0 bg-transparent p-0 text-center text-sm shadow-none focus-visible:ring-0"
+                        />
+                        <span className="text-xs text-muted-foreground">%</span>
+                      </div>
+                    </div>
 
-          <Button
-            disabled={cart.lines.length === 0}
-            onClick={() => {
-              const o = createOrder(channel);
-              if (o) toast.success(`Order ${o.id} sent to kitchen`);
-            }}
-            className="h-12 w-full rounded-2xl gradient-brand text-primary-foreground shadow-soft"
-          >
-            <ChefHat className="mr-2 size-4" /> Send to Kitchen
-          </Button>
-        </div>
+                    <div className="space-y-1.5 text-sm">
+                      <Row label="Subtotal" value={`₹ ${totals.subtotal}`} />
+                      {totals.discount > 0 && <Row label={`Discount (${cart.discountPct}%)`} value={`- ₹ ${totals.discount}`} accent />}
+                      <Row label="GST" value={`₹ ${totals.tax}`} muted />
+                      <Separator className="my-2" />
+                      <div className="flex items-center justify-between">
+                        <span className="font-display text-base font-semibold">Total</span>
+                        <span className="font-display text-2xl font-bold text-gradient-brand">₹ {totals.total}</span>
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={() => {
+                        const o = createOrder(channel);
+                        if (o) toast.success(`Order ${o.id} sent to kitchen`);
+                      }}
+                      className="h-12 w-full rounded-2xl gradient-brand text-primary-foreground shadow-soft"
+                    >
+                      <ChefHat className="mr-2 size-4" /> Send to Kitchen
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
+        )}
       </Card>
     </div>
   );
@@ -360,35 +393,120 @@ function PayDialog({ order, onClose }: { order: Order | null; onClose: () => voi
 }
 
 // -------------------- HISTORY --------------------
+function fmt(ts?: number) {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 function HistoryView({ orders }: { orders: Order[] }) {
+  const [open, setOpen] = useState<string | null>(null);
   if (orders.length === 0) {
     return <div className="rounded-3xl border border-dashed bg-card p-12 text-center text-sm text-muted-foreground">No completed orders yet.</div>;
   }
   return (
-    <Card className="overflow-hidden rounded-3xl">
-      <div className="divide-y">
-        {orders.map((o) => (
-          <div key={o.id} className="grid grid-cols-12 items-center gap-3 px-4 py-3 transition hover:bg-secondary/40 md:px-6">
-            <div className="col-span-6 md:col-span-3">
-              <p className="font-medium">{o.id}</p>
-              <p className="text-xs text-muted-foreground">{o.channel} · {o.type}</p>
-            </div>
-            <div className="col-span-6 md:col-span-3 text-xs text-muted-foreground">
-              {o.lines.length} items · {o.lines.reduce((s, l) => s + l.qty, 0)} qty
-            </div>
-            <div className="col-span-6 md:col-span-2 text-xs text-muted-foreground">
-              {new Date(o.paidAt ?? o.placedAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-            </div>
-            <div className="col-span-3 md:col-span-2">
-              <Badge className={"rounded-full border-0 " + (o.status === "Paid" ? "bg-leaf/15 text-leaf" : "bg-secondary")}>
-                {o.status}{o.payMethod ? ` · ${o.payMethod.toUpperCase()}` : ""}
-              </Badge>
-            </div>
-            <div className="col-span-3 text-right font-display text-base font-semibold md:col-span-2">₹ {o.totals.total}</div>
-          </div>
-        ))}
-      </div>
-    </Card>
+    <div className="space-y-2">
+      {orders.map((o) => {
+        const isOpen = open === o.id;
+        const T = channelTypeIcon[o.type];
+        const prep = o.readyAt ? Math.max(0, Math.round((o.readyAt - o.placedAt) / 60_000)) : null;
+        const settle = o.paidAt && o.servedAt ? Math.max(0, Math.round((o.paidAt - o.servedAt) / 60_000)) : null;
+        return (
+          <Card key={o.id} className="overflow-hidden rounded-2xl">
+            <button onClick={() => setOpen(isOpen ? null : o.id)} className="grid w-full grid-cols-12 items-center gap-3 px-4 py-3 text-left transition hover:bg-secondary/40 md:px-6">
+              <div className="col-span-6 md:col-span-3">
+                <p className="font-medium">{o.id}</p>
+                <p className="text-xs text-muted-foreground"><T className="mr-1 inline size-3" />{o.channel} · {o.type}</p>
+              </div>
+              <div className="hidden text-xs text-muted-foreground md:col-span-3 md:block">
+                {o.lines.length} items · {o.lines.reduce((s, l) => s + l.qty, 0)} qty
+              </div>
+              <div className="col-span-6 text-xs text-muted-foreground md:col-span-2">
+                Paid {fmt(o.paidAt ?? o.placedAt)}
+              </div>
+              <div className="col-span-4 md:col-span-2">
+                <Badge className={"rounded-full border-0 " + (o.status === "Paid" ? "bg-leaf/15 text-leaf" : "bg-secondary")}>
+                  {o.status}{o.payMethod ? ` · ${o.payMethod.toUpperCase()}` : ""}
+                </Badge>
+              </div>
+              <div className="col-span-8 flex items-center justify-end gap-2 md:col-span-2">
+                <span className="font-display text-base font-semibold">₹ {o.totals.total}</span>
+                {isOpen ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+              </div>
+            </button>
+
+            <AnimatePresence initial={false}>
+              {isOpen && (
+                <motion.div
+                  key="detail"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden border-t"
+                >
+                  <div className="grid gap-4 p-4 md:grid-cols-[1.2fr_1fr] md:p-6">
+                    {/* Items */}
+                    <div className="space-y-1.5 rounded-2xl bg-secondary/40 p-3 text-sm">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Items</p>
+                      {o.lines.map((l) => (
+                        <div key={l.itemId} className="flex items-center justify-between">
+                          <span>{l.emoji} ×{l.qty} {l.name}</span>
+                          <span className="text-muted-foreground">₹ {l.price * l.qty}</span>
+                        </div>
+                      ))}
+                      {o.note && (
+                        <p className="mt-2 rounded-lg border border-warning/30 bg-warning/10 p-2 text-xs italic text-warning">
+                          <StickyNote className="mr-1 inline size-3" />{o.note}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Timeline + totals */}
+                    <div className="space-y-3">
+                      <div className="rounded-2xl border bg-card p-3 text-xs">
+                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Service timeline</p>
+                        <Timeline label="Order placed" ts={o.placedAt} />
+                        <Timeline label="Ready in kitchen" ts={o.readyAt} />
+                        <Timeline label="Served to guest" ts={o.servedAt} />
+                        <Timeline label="Payment received" ts={o.paidAt} accent />
+                        <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                          {prep !== null && <Badge variant="secondary" className="rounded-full">Prep {prep}m</Badge>}
+                          {settle !== null && <Badge variant="secondary" className="rounded-full">Bill settled in {settle}m</Badge>}
+                          {o.payMethod && <Badge variant="secondary" className="rounded-full uppercase">{o.payMethod}</Badge>}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5 rounded-2xl border bg-card p-3 text-sm">
+                        <Row label="Subtotal" value={`₹ ${o.totals.subtotal}`} />
+                        {o.totals.discount > 0 && <Row label={`Discount (${o.discountPct}%)`} value={`- ₹ ${o.totals.discount}`} accent />}
+                        <Row label="GST" value={`₹ ${o.totals.tax}`} muted />
+                        <Separator className="my-1.5" />
+                        <div className="flex items-center justify-between">
+                          <span className="font-display text-base font-semibold">Total paid</span>
+                          <span className="font-display text-xl font-bold text-gradient-brand">₹ {o.totals.total}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+function Timeline({ label, ts, accent }: { label: string; ts?: number; accent?: boolean }) {
+  return (
+    <div className="flex items-center justify-between py-1">
+      <span className={"inline-flex items-center gap-1.5 " + (accent ? "font-medium text-foreground" : "text-muted-foreground")}>
+        <span className={"size-1.5 rounded-full " + (ts ? (accent ? "bg-primary" : "bg-leaf") : "bg-border")} />
+        {label}
+      </span>
+      <span className={ts ? "tabular-nums" : "text-muted-foreground"}>{fmt(ts)}</span>
+    </div>
   );
 }
 

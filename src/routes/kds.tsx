@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, CheckCircle2, Soup, Bike, ShoppingBag, Utensils, ChevronDown, Circle, StickyNote } from "lucide-react";
+import { Clock, CheckCircle2, Soup, ShoppingBag, Utensils, ChevronDown, Circle, StickyNote } from "lucide-react";
 import { Topbar } from "@/components/Topbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,6 @@ export const Route = createFileRoute("/kds")({
 const typeStyles: Record<Order["type"], { icon: typeof Soup; color: string }> = {
   "Dine-in": { icon: Utensils, color: "bg-primary/10 text-primary" },
   Takeaway: { icon: ShoppingBag, color: "bg-warning/15 text-warning" },
-  Delivery: { icon: Bike, color: "bg-leaf/15 text-leaf" },
 };
 
 const statusStyle: Record<OrderStatus, string> = {
@@ -32,14 +31,22 @@ const statusStyle: Record<OrderStatus, string> = {
   Paid: "bg-primary/10 text-primary",
 };
 
+function fmtElapsed(ms: number) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 function KDS() {
   const orders = useStore((s) => s.orders);
   const setOrderStatus = useStore((s) => s.setOrderStatus);
   const [filter, setFilter] = useState<"all" | Order["type"]>("all");
   const [, setTick] = useState(0);
 
+  // Tick once a second so the small live timer updates smoothly.
   useEffect(() => {
-    const t = setInterval(() => setTick((x) => x + 1), 30_000);
+    const t = setInterval(() => setTick((x) => x + 1), 1000);
     return () => clearInterval(t);
   }, []);
 
@@ -53,7 +60,7 @@ function KDS() {
 
       <div className="flex-1 space-y-4 p-4 md:p-6">
         <div className="flex flex-wrap items-center gap-2">
-          {(["all", "Dine-in", "Takeaway", "Delivery"] as const).map((f) => (
+          {(["all", "Dine-in", "Takeaway"] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -75,8 +82,8 @@ function KDS() {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           <AnimatePresence>
             {visible.map((o) => {
-              const minsAgo = Math.max(0, Math.floor((Date.now() - o.placedAt) / 60_000));
-              const delayed = minsAgo >= 12 && o.status === "Preparing";
+              const elapsedMs = Date.now() - o.placedAt;
+              const delayed = elapsedMs >= 12 * 60_000 && o.status === "Preparing";
               const T = typeStyles[o.type];
               return (
                 <motion.div
@@ -91,8 +98,21 @@ function KDS() {
                   }
                 >
                   <div className="flex items-center justify-between border-b bg-gradient-to-r from-secondary/60 to-card p-4">
-                    <div>
-                      <p className="font-display text-lg font-semibold tracking-tight">{o.id}</p>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-display text-lg font-semibold tracking-tight">{o.id}</p>
+                        {/* Subtle live timer */}
+                        <span
+                          className={
+                            "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums " +
+                            (delayed ? "bg-destructive/10 text-destructive" : "bg-secondary text-muted-foreground")
+                          }
+                          title="Time since order placed"
+                        >
+                          <Clock className="size-2.5" />
+                          {fmtElapsed(elapsedMs)}
+                        </span>
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         Table <span className="font-medium text-foreground">{o.channel}</span>
                       </p>
@@ -121,10 +141,7 @@ function KDS() {
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between gap-2 border-t bg-background p-3">
-                    <div className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-medium text-muted-foreground">
-                      <Clock className="size-3" /> {minsAgo}m
-                    </div>
+                  <div className="flex items-center justify-end border-t bg-background p-3">
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button size="sm" variant="outline" className={"rounded-full " + statusStyle[o.status]}>
