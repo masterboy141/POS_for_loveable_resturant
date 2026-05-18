@@ -16,7 +16,7 @@ export type TableState = {
   seats: number;
   status: TableStatus;
   occupied: number;
-  reservedAt?: string; // ISO datetime-local string for reservation
+  reservedAt?: string;
   reservedName?: string;
 };
 
@@ -26,56 +26,50 @@ export type PayMethod = "upi" | "card" | "cash";
 export type OrderLine = { itemId: string; name: string; emoji: string; price: number; gst: number; qty: number };
 export type Order = {
   id: string;
-  channel: string; // tableId or "Takeaway" / "Delivery"
-  type: "Dine-in" | "Takeaway" | "Delivery";
+  channel: string; // tableId or "Takeaway"
+  type: "Dine-in" | "Takeaway";
   lines: OrderLine[];
   note?: string;
   discountPct: number;
   status: OrderStatus;
-  placedAt: number; // epoch ms
+  placedAt: number;
+  readyAt?: number;
+  servedAt?: number;
   paidAt?: number;
   payMethod?: PayMethod;
   totals: { subtotal: number; discount: number; tax: number; total: number };
 };
 
-// ----- helpers -----
 export function computeTotals(lines: OrderLine[], discountPct: number) {
   const subtotal = lines.reduce((s, l) => s + l.price * l.qty, 0);
   const discount = Math.round((subtotal * discountPct) / 100);
-  const taxable = subtotal - discount;
-  // weighted GST per line
   const tax = Math.round(
     lines.reduce((s, l) => {
       const lineTaxable = l.price * l.qty - (l.price * l.qty * discountPct) / 100;
       return s + (lineTaxable * (l.gst || 5)) / 100;
     }, 0),
   );
-  const total = taxable + tax;
+  const total = subtotal - discount + tax;
   return { subtotal, discount, tax, total };
 }
 
 let orderSeq = 2045;
 const newOrderId = () => `ORD-${orderSeq++}`;
 
-// ----- store -----
 type Store = {
   menu: EditableMenuItem[];
   tables: TableState[];
-  // per-channel draft carts (channel = tableId or "Takeaway"/"Delivery")
   carts: Record<string, { lines: OrderLine[]; note: string; discountPct: number }>;
   orders: Order[];
 
-  // menu
   updateMenuItem: (id: string, patch: Partial<EditableMenuItem>) => void;
   addMenuItem: (item: Omit<EditableMenuItem, "id">) => void;
   removeMenuItem: (id: string) => void;
 
-  // tables
   setTableStatus: (id: string, status: TableStatus) => void;
   setTableOccupied: (id: string, n: number) => void;
   setTableReservation: (id: string, reservedAt?: string, reservedName?: string) => void;
 
-  // carts
   ensureCart: (channel: string) => void;
   addToCart: (channel: string, item: EditableMenuItem) => void;
   changeQty: (channel: string, itemId: string, delta: number) => void;
@@ -83,8 +77,8 @@ type Store = {
   setNote: (channel: string, note: string) => void;
   setDiscount: (channel: string, pct: number) => void;
   clearCart: (channel: string) => void;
+  clearAllCarts: () => void;
 
-  // orders
   createOrder: (channel: string) => Order | null;
   setOrderStatus: (id: string, status: OrderStatus) => void;
   payOrder: (id: string, method: PayMethod) => void;
@@ -124,6 +118,7 @@ export const useStore = create<Store>((set, get) => ({
       discountPct: 0,
       status: "Ready",
       placedAt: Date.now() - 9 * 60_000,
+      readyAt: Date.now() - 2 * 60_000,
       totals: { subtotal: 480, discount: 0, tax: 24, total: 504 },
     },
     {
@@ -137,6 +132,8 @@ export const useStore = create<Store>((set, get) => ({
       discountPct: 5,
       status: "Paid",
       placedAt: Date.now() - 90 * 60_000,
+      readyAt: Date.now() - 78 * 60_000,
+      servedAt: Date.now() - 70 * 60_000,
       paidAt: Date.now() - 60 * 60_000,
       payMethod: "upi",
       totals: { subtotal: 360, discount: 18, tax: 17, total: 359 },
@@ -144,7 +141,17 @@ export const useStore = create<Store>((set, get) => ({
   ],
 
   updateMenuItem: (id, patch) =>
-    set((s) => ({ menu: s.menu.map((m) => (m.id === id ? { ...m, ...patch } : m)) })),
+    set((s) => {
+      const nextMenu = s.menu.map((m) => (m.id === id ? { ...m, ...patch } : m));
+      // Sync: if item is now out of stock, strip it from every active cart.
+      const wentOOS = patch.inStock === false;
+      if (!wentOOS) return { menu: nextMenu };
+      const nextCarts: typeof s.carts = {};
+      for (const [ch, cart] of Object.entries(s.carts)) {
+        nextCarts[ch] = { ...cart, lines: cart.lines.filter((l) => l.itemId !== id) };
+      }
+      return { menu: nextMenu, carts: nextCarts };
+    }),
   addMenuItem: (item) =>
     set((s) => ({ menu: [{ ...item, id: "m" + Math.random().toString(36).slice(2, 7) }, ...s.menu] })),
   removeMenuItem: (id) => set((s) => ({ menu: s.menu.filter((m) => m.id !== id) })),
@@ -214,12 +221,13 @@ export const useStore = create<Store>((set, get) => ({
     }),
   clearCart: (channel) =>
     set((s) => ({ carts: { ...s.carts, [channel]: { lines: [], note: "", discountPct: 0 } } })),
+  clearAllCarts: () => set({ carts: {} }),
 
   createOrder: (channel) => {
     const state = get();
     const cart = state.carts[channel];
     if (!cart || cart.lines.length === 0) return null;
-    const type: Order["type"] = channel === "Takeaway" ? "Takeaway" : channel === "Delivery" ? "Delivery" : "Dine-in";
+    const type: Order["type"] = channel === "Takeaway" ? "Takeaway" : "Dine-in";
     const totals = computeTotals(cart.lines, cart.discountPct);
     const order: Order = {
       id: newOrderId(),
@@ -239,11 +247,28 @@ export const useStore = create<Store>((set, get) => ({
     return order;
   },
   setOrderStatus: (id, status) =>
-    set((s) => ({ orders: s.orders.map((o) => (o.id === id ? { ...o, status } : o)) })),
+    set((s) => ({
+      orders: s.orders.map((o) => {
+        if (o.id !== id) return o;
+        const stamps: Partial<Order> = {};
+        if (status === "Ready" && !o.readyAt) stamps.readyAt = Date.now();
+        if (status === "Served" && !o.servedAt) stamps.servedAt = Date.now();
+        return { ...o, status, ...stamps };
+      }),
+    })),
   payOrder: (id, method) =>
     set((s) => ({
       orders: s.orders.map((o) =>
-        o.id === id ? { ...o, status: "Paid", payMethod: method, paidAt: Date.now() } : o,
+        o.id === id
+          ? {
+              ...o,
+              status: "Paid",
+              payMethod: method,
+              paidAt: Date.now(),
+              servedAt: o.servedAt ?? Date.now(),
+              readyAt: o.readyAt ?? Date.now(),
+            }
+          : o,
       ),
     })),
 }));
