@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart,
   ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis,
@@ -300,28 +300,23 @@ function Dashboard() {
             </CardHeader>
             <CardContent className="px-0">
               <div className="divide-y">
-                {orders.filter((o) => o.status === "Preparing" || o.status === "Ready").slice(0, 6).map((o) => {
-                  const mins = Math.max(0, Math.floor((Date.now() - o.placedAt) / 60_000));
-                  return (
-                    <div key={o.id} className="flex items-center gap-4 px-6 py-3 transition hover:bg-secondary/50">
-                      <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 font-display text-sm font-semibold text-primary">
-                        {o.channel}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="truncate font-medium">{o.id}</p>
-                          <Badge variant="secondary" className={"rounded-full text-[11px] " + (o.status === "Ready" ? "bg-leaf/15 text-leaf" : "bg-warning/15 text-warning")}>
-                            {o.status}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">{o.lines.length} items · ₹ {o.totals.total}</p>
-                      </div>
-                      <div className="flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs text-muted-foreground">
-                        <Clock className="size-3" /> {mins} min
-                      </div>
+                {orders.filter((o) => o.status === "Preparing" || o.status === "Ready").slice(0, 6).map((o) => (
+                  <div key={o.id} className="flex items-center gap-4 px-6 py-3 transition hover:bg-secondary/50">
+                    <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 font-display text-sm font-semibold text-primary">
+                      {o.channel}
                     </div>
-                  );
-                })}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-medium">{o.id}</p>
+                        <Badge variant="secondary" className={"rounded-full text-[11px] " + (o.status === "Ready" ? "bg-leaf/15 text-leaf" : "bg-warning/15 text-warning")}>
+                          {o.status}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{o.lines.length} items · ₹ {o.totals.total}</p>
+                    </div>
+                    <MinsAgo placedAt={o.placedAt} />
+                  </div>
+                ))}
                 {orders.filter((o) => o.status === "Preparing" || o.status === "Ready").length === 0 && (
                   <p className="px-6 py-8 text-center text-sm text-muted-foreground">No active tickets right now.</p>
                 )}
