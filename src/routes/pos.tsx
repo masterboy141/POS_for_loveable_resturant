@@ -31,19 +31,14 @@ const channelTypeIcon = { "Dine-in": Utensils, Takeaway: ShoppingBag } as const;
 
 function BillingPage() {
   const tables = useStore((s) => s.tables);
-  const clearAllCarts = useStore((s) => s.clearAllCarts);
   const channels = useMemo(() => [...tables.map((t) => t.id), "Takeaway"], [tables]);
   const [channel, setChannel] = useState<string>("T1");
   const [tab, setTab] = useState<"new" | "pending" | "history">("new");
   const orders = useStore((s) => s.orders);
 
-  // Wipe all draft carts whenever the user leaves the Billing screen.
-  useEffect(() => {
-    return () => clearAllCarts();
-  }, [clearAllCarts]);
-
   const pending = orders.filter((o) => o.status !== "Paid" && o.status !== "Served");
   const history = orders.filter((o) => o.status === "Paid" || o.status === "Served");
+
 
   return (
     <div className="flex min-h-screen flex-col">
