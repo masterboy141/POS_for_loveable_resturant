@@ -374,3 +374,18 @@ function PeriodToggle<T extends string>({
     </div>
   );
 }
+
+function MinsAgo({ placedAt }: { placedAt: number }) {
+  const [mins, setMins] = useState<number | null>(null);
+  useEffect(() => {
+    const update = () => setMins(Math.max(0, Math.floor((Date.now() - placedAt) / 60_000)));
+    update();
+    const t = setInterval(update, 30_000);
+    return () => clearInterval(t);
+  }, [placedAt]);
+  return (
+    <div className="flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs text-muted-foreground">
+      <Clock className="size-3" /> {mins ?? 0} min
+    </div>
+  );
+}
