@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Minus, Plus, Search, Trash2, CreditCard, Wallet, QrCode, Receipt, Percent, ChefHat, History, Clock, CheckCircle2, StickyNote, ShoppingBag, Utensils, ChevronDown, ChevronUp,
 } from "lucide-react";
@@ -138,38 +138,30 @@ function NewOrderView({ channel, setChannel, channels }: { channel: string; setC
         </div>
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-          <AnimatePresence mode="popLayout">
-            {filtered.map((m) => (
-              <motion.button
-                key={m.id}
-                layout
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => { addToCart(channel, m); }}
-                className="group flex flex-col overflow-hidden rounded-2xl border bg-card text-left shadow-sm transition hover:shadow-soft"
-              >
-                <div className="relative flex h-24 items-center justify-center bg-gradient-to-br from-secondary to-cream text-5xl">
-                  {m.emoji}
-                  <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-medium text-leaf backdrop-blur">
-                    <span className="size-1.5 rounded-full bg-leaf" /> Veg
+          {filtered.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => { addToCart(channel, m); }}
+              className="group flex flex-col overflow-hidden rounded-2xl border bg-card text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft active:scale-[0.98]"
+            >
+              <div className="relative flex h-24 items-center justify-center bg-gradient-to-br from-secondary to-cream text-5xl">
+                {m.emoji}
+                <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-medium text-leaf backdrop-blur">
+                  <span className="size-1.5 rounded-full bg-leaf" /> Veg
+                </span>
+              </div>
+              <div className="flex flex-1 flex-col gap-1 p-3">
+                <p className="line-clamp-1 text-sm font-semibold">{m.name}</p>
+                <p className="line-clamp-1 text-[11px] capitalize text-muted-foreground">{m.category} · GST {m.gst}%</p>
+                <div className="mt-auto flex items-center justify-between pt-1">
+                  <span className="font-display text-base font-semibold">₹{m.price}</span>
+                  <span className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+                    <Plus className="size-4" />
                   </span>
                 </div>
-                <div className="flex flex-1 flex-col gap-1 p-3">
-                  <p className="line-clamp-1 text-sm font-semibold">{m.name}</p>
-                  <p className="line-clamp-1 text-[11px] capitalize text-muted-foreground">{m.category} · GST {m.gst}%</p>
-                  <div className="mt-auto flex items-center justify-between pt-1">
-                    <span className="font-display text-base font-semibold">₹{m.price}</span>
-                    <span className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
-                      <Plus className="size-4" />
-                    </span>
-                  </div>
-                </div>
-              </motion.button>
-            ))}
-          </AnimatePresence>
+              </div>
+            </button>
+          ))}
         </div>
       </div>
 
