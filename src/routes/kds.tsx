@@ -38,17 +38,34 @@ function fmtElapsed(ms: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+function ElapsedPill({ placedAt, status }: { placedAt: number; status: OrderStatus }) {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  if (now === null) return null;
+  const elapsed = now - placedAt;
+  const delayed = elapsed >= 12 * 60_000 && status === "Preparing";
+  return (
+    <span
+      className={
+        "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums " +
+        (delayed ? "bg-destructive/10 text-destructive" : "bg-secondary text-muted-foreground")
+      }
+      title="Time since order placed"
+    >
+      <Clock className="size-2.5" />
+      {fmtElapsed(elapsed)}
+    </span>
+  );
+}
+
 function KDS() {
   const orders = useStore((s) => s.orders);
   const setOrderStatus = useStore((s) => s.setOrderStatus);
   const [filter, setFilter] = useState<"all" | Order["type"]>("all");
-  const [, setTick] = useState(0);
-
-  // Tick once a second so the small live timer updates smoothly.
-  useEffect(() => {
-    const t = setInterval(() => setTick((x) => x + 1), 1000);
-    return () => clearInterval(t);
-  }, []);
 
   const visible = orders.filter(
     (o) => o.status !== "Paid" && o.status !== "Served" && (filter === "all" || o.type === filter),
@@ -80,38 +97,22 @@ function KDS() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          <AnimatePresence>
+          <AnimatePresence initial={false}>
             {visible.map((o) => {
-              const elapsedMs = Date.now() - o.placedAt;
-              const delayed = elapsedMs >= 12 * 60_000 && o.status === "Preparing";
               const T = typeStyles[o.type];
               return (
                 <motion.div
                   key={o.id}
-                  layout
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className={
-                    "flex flex-col overflow-hidden rounded-3xl border bg-card shadow-soft transition " +
-                    (delayed ? "ring-2 ring-destructive/60" : "")
-                  }
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="flex flex-col overflow-hidden rounded-3xl border bg-card shadow-soft"
                 >
                   <div className="flex items-center justify-between border-b bg-gradient-to-r from-secondary/60 to-card p-4">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="truncate font-display text-lg font-semibold tracking-tight">{o.id}</p>
-                        {/* Subtle live timer */}
-                        <span
-                          className={
-                            "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums " +
-                            (delayed ? "bg-destructive/10 text-destructive" : "bg-secondary text-muted-foreground")
-                          }
-                          title="Time since order placed"
-                        >
-                          <Clock className="size-2.5" />
-                          {fmtElapsed(elapsedMs)}
-                        </span>
+                        <ElapsedPill placedAt={o.placedAt} status={o.status} />
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Table <span className="font-medium text-foreground">{o.channel}</span>
